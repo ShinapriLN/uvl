@@ -1,0 +1,18 @@
+[project]
+name = "uvl"
+version = "0.0.1"
+description = "Universal Linker: Optimized package management for 40+ tools across Python, JS, Rust, Go, JVM, and more."
+dependencies = []
+requires-python = ">=3.8"
+
+[project.scripts]
+uvl = "uvl:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.uv.workspace]
+members = [
+    "test_proj",
+]
