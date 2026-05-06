@@ -1,6 +1,6 @@
 [project]
 name = "uvl"
-version = "0.0.1"
+version = "0.0.2"
 description = "Universal Linker: Optimized package management for 40+ tools across Python, JS, Rust, Go, JVM, and more."
 dependencies = []
 requires-python = ">=3.8"
