@@ -1,93 +1,190 @@
-# uvl 
+# uvl
 
-An (almost) Universal Linker 🚀
+`uvl` lets package managers keep using their normal dependency directories while
+a FUSE filesystem redirects the physical files into a shared global store.
 
-**Solve disk space bloat across all your development ecosystems.**
-
-`uvl` is a high-performance, zero-dependency CLI wrapper that enforces "Best-in-Class" storage optimization for over 40+ package managers. It ensures that your `node_modules`, `.venv`, and global caches are centralized and deduplicated, saving you gigabytes of disk space.
-
----
-
-## Why uvl? 💾
-
-Modern development environments are disk space black holes. 
-- **Python:** Every `.venv` often contains full copies of massive libraries like `torch` or `pandas`.
-- **Node.js:** `node_modules` is notoriously heavy and duplicated across every project.
-- **Rust/Go/JVM:** Global caches are often scattered and unmanaged.
-
-**`uvl` fixes this by:**
-1. **Centralizing:** Redirecting all tool caches to a single, managed store at `~/.uvl/store/`.
-2. **Linking:** Forcing tools (like `uv`) to use **symbolic links** instead of full copies.
-3. **Optimizing:** Automatically injecting the best storage-saving flags (like `--store-dir` for `pnpm`) without you having to remember them.
-
----
-
-## Installation 📦
-
-Install `uvl` globally using your preferred tool:
+Your project still sees `node_modules`, `.venv`, `vendor`, or any other entry
+directory the package manager expects. The bytes live under:
 
 ```bash
-# clone 
-git clone https://github.com/ShinapriLN/uvl.git 
-cd uvl
+~/.uvl/store/<manager>
+```
 
-# Using uv
+That means existing tools, editors, and runtime resolution keep working, but
+duplicated dependency files can be stored once and mounted back into each project
+as a read-only virtual directory.
+
+## Install
+
+From PyPI:
+
+```bash
+pipx install uvl
+# or
+uv tool install uvl
+```
+
+From this repository:
+
+```bash
 uv tool install .
-
-# Using pip
-pip install .
 ```
 
----
+`uvl` compiles a small C FUSE engine on first mount. On Linux you need `gcc`,
+`pkg-config`, and FUSE 3 development headers installed.
 
-## Usage 🛠️
+## Build From Source
 
-Simply prefix your usual package manager commands with `uvl`.
+The repository currently has two runnable paths:
 
-### Examples:
+- `build/uvl`: a single native binary built by CMake. It handles the CLI,
+  package-manager wrapping, object storage, and FUSE mount mode in one
+  executable.
+- Python package entrypoint: kept for packaging compatibility while the native
+  binary matures.
+
+Use the Makefile wrapper for day-to-day commands:
 
 ```bash
-# Optimized Python environment (uses symlinks to global store)
-uvl uv add requests
-
-# Optimized JS installation (uses pnpm content-addressable store)
-uvl pnpm install
-
-# Centralized Cargo registry
-uvl cargo build
-
-# Check if a tool is supported and installed
-uvl --has bun
+make          # configure CMake and build the C FUSE engine
+make build    # same as make
+make check    # build C code and run Python import/CLI checks
+make wheel    # build the Python wheel
+make clean    # remove build outputs and Python bytecode
 ```
 
-### Pro Tip:
-Add an alias to your `.zshrc` or `.bashrc` to make it even faster:
+The native build output is created at:
+
 ```bash
-alias uv="uvl uv"
-alias pnpm="uvl pnpm"
+build/uvl
 ```
 
----
+The native binary starts its own internal FUSE mode by re-executing itself as
+`uvl __mount ...`, so there is no separate `uvl_fuse` binary in the CMake build.
 
-## Supported Tools (44+) 🌍
+## Mount A Package Manager
 
-`uvl` provides optimized storage mappings for:
+Register the package manager binary and the dependency directory it owns:
 
-| Ecosystem | Supported Tools |
-| :--- | :--- |
-| **Python** | `uv`, `pip`, `poetry`, `pdm`, `pipenv`, `conda`, `mamba`, `micromamba`, `pixi` |
-| **JS / TS** | `npm`, `pnpm`, `yarn`, `bun`, `deno` |
-| **Rust** | `cargo` |
-| **Go** | `go` |
-| **JVM** | `mvn`, `gradle`, `sbt`, `coursier`, `lein` |
-| **.NET** | `dotnet`, `nuget` |
-| **PHP** | `composer` |
-| **Ruby** | `gem`, `bundle` |
-| **C / C++** | `vcpkg`, `conan`, `spack` |
-| **Mobile / Others** | `dart`, `pub`, `swift`, `mix`, `rebar3`, `cabal`, `stack`, `opam`, `julia`, `R`, `luarocks`, `zig`, `nimble`, `shards` |
+```bash
+uvl --fuse bun --mnt node_modules
+```
 
----
+```text
+🚀 bun has been mounted with uvl.
+👍 now you can use `uvl bun ...` with any bun arguments.
+✨ node_modules will physically store at ~/.uvl/store/bun
 
-## Goal 🎯
+💥 Caution: While a directory is mounted by uvl, avoid deleting or modifying it directly.
+Unmount it first with `uvl --unmnt node_modules`.
+```
 
-Stop wasting disk space on duplicated dependencies. One store to rule them all.
+Then run the package manager through `uvl` when dependencies may change:
+
+```bash
+uvl bun install
+uvl bun add vite
+uvl bun remove vite
+```
+
+After the package manager finishes, `uvl` scans the dependency directory, moves
+physical files into `~/.uvl/store/bun/objects`, updates the project `.uvl`
+binary manifest, clears the local directory, and mounts the
+virtual view back at `node_modules`.
+
+The directory still works as normal:
+
+```bash
+bun run index.ts
+uvl bun run index.ts
+```
+
+But disk usage in the project directory is near zero:
+
+```bash
+du -sh node_modules
+# 0 node_modules
+```
+
+## Python Example
+
+Register `uv` with its virtual environment directory:
+
+```bash
+uvl --fuse uv --mnt .venv
+```
+
+Create or sync a project through `uvl`:
+
+```bash
+uvl uv init app
+cd app
+uvl uv sync
+```
+
+`uvl` mounts `.venv` after `uv sync`, while the stored files live under:
+
+```bash
+~/.uvl/store/uv
+```
+
+Running through either command still works:
+
+```bash
+uvl uv run main.py
+uv run main.py
+```
+
+## Unmount
+
+Mounted dependency directories are intentionally read-only. If you want to
+delete, inspect, or rebuild the directory directly, unmount it first:
+
+```bash
+uvl --unmnt .venv
+```
+
+```text
+✅ Unmounted .venv
+⚡ You can now delete or modify anything inside
+```
+
+After unmounting, the mount point is just a normal directory again.
+
+## Commands
+
+```bash
+uvl --fuse <tool> --mnt <dir>    Register a package manager mount directory
+uvl <tool> [args...]              Run a mounted package manager
+uvl --unmnt <dir>                 Unmount a virtualized directory
+uvl --status                      Show current project mount status
+uvl --list                        List registered package manager binaries
+uvl --has <tool>                  Check if a mounted tool is installed
+uvl --version                     Print the version
+```
+
+`uvl` has defaults for common tools, so this is also valid:
+
+```bash
+uvl --fuse bun
+uvl --fuse uv
+```
+
+## How It Works
+
+1. `uvl --fuse <tool> --mnt <dir>` saves a registration in
+   `~/.uvl/config.json`.
+2. `uvl <tool> ...` runs the real package manager binary with the same
+   arguments.
+3. If the registered entry directory exists and is not already mounted, `uvl`
+   scans the result.
+4. Files are content-addressed by SHA-256 and stored under
+   `~/.uvl/store/<tool>/objects`.
+5. A binary project `.uvl` manifest stores every mounted tool, mount directory,
+   and virtual path map for fast loading. One project can track entries such as
+   `.venv` and `node_modules` at the same time.
+6. A C FUSE daemon mounts a read-only virtual filesystem at the original
+   dependency directory.
+
+The goal is simple: package managers keep their normal layout; projects stop
+holding duplicate physical dependency trees.
