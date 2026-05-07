@@ -19,20 +19,47 @@ as a read-only virtual directory.
 From PyPI:
 
 ```bash
-pipx install uvl
+pipx install uvl-fuse
 # or
-uv tool install uvl
+uv tool install uvl-fuse
 ```
 
 From this repository:
 
 ```bash
+git clone https://github.com/ShinapriLN/uvl.git
+cd uvl
+make build
 uv tool install .
 ```
 
 Prebuilt wheels include the native engine, so installation does not compile
 anything. On Linux, runtime mounting still needs FUSE support and permission to
 mount filesystems.
+
+If you build from source instead of using a prebuilt wheel, install:
+
+- `cmake`
+- a C compiler such as `gcc` or `clang`
+- `pkg-config`
+- FUSE 3 development headers
+- OpenSSL development headers
+- Python 3.8+ and `uv` if you want to build the wheel locally
+
+## Platform Support
+
+Current published wheels:
+
+- Linux x86_64
+
+Runtime requirements:
+
+- Linux kernel FUSE support
+- `/dev/fuse` access
+- `fusermount3` or an equivalent FUSE unmount helper
+
+Source builds are still possible from this repository, but the published PyPI
+package is intended for Linux x86_64 users who want a prebuilt wheel.
 
 ## Build From Source
 
