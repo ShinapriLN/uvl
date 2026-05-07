@@ -38,3 +38,8 @@ jobs:
         with:
           name: uvl-linux-wheel
           path: wheelhouse/*.whl
+          
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: wheelhouse
