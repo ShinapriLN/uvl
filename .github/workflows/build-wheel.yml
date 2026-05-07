@@ -19,10 +19,13 @@ jobs:
         run: |
           dnf -y install fuse3-devel openssl-devel pkgconfig cmake make
 
+      - name: Build native binary
+        run: |
+          make build
+
       - name: Build wheel
         run: |
           /opt/python/cp312-cp312/bin/python -m pip install -U build hatchling wheel auditwheel
-          rm -rf build dist wheelhouse
           /opt/python/cp312-cp312/bin/python -m build --wheel
 
       - name: Audit and repair wheel
