@@ -1,10 +1,10 @@
 # uvl
 
-`uvl` lets package managers keep using their normal dependency directories while
+`uvl` lets tools keep using their normal dependency directories while
 a FUSE filesystem redirects the physical files into a shared global store.
 
 Your project still sees `node_modules`, `.venv`, `vendor`, or any other entry
-directory the package manager expects. The bytes live under:
+directory the tool expects. The bytes live under:
 
 ```bash
 ~/.uvl/store/<manager>
@@ -30,15 +30,16 @@ From this repository:
 uv tool install .
 ```
 
-`uvl` compiles a small C FUSE engine on first mount. On Linux you need `gcc`,
-`pkg-config`, and FUSE 3 development headers installed.
+Prebuilt wheels include the native engine, so installation does not compile
+anything. On Linux, runtime mounting still needs FUSE support and permission to
+mount filesystems.
 
 ## Build From Source
 
 The repository currently has two runnable paths:
 
 - `build/uvl`: a single native binary built by CMake. It handles the CLI,
-  package-manager wrapping, object storage, and FUSE mount mode in one
+  tool wrapping, object storage, and FUSE mount mode in one
   executable.
 - Python package entrypoint: kept for packaging compatibility while the native
   binary matures.
@@ -46,10 +47,10 @@ The repository currently has two runnable paths:
 Use the Makefile wrapper for day-to-day commands:
 
 ```bash
-make          # configure CMake and build the C FUSE engine
+make          # configure CMake and build the native binary
 make build    # same as make
 make check    # build C code and run Python import/CLI checks
-make wheel    # build the Python wheel
+make wheel    # build a wheel with the bundled native binary
 make clean    # remove build outputs and Python bytecode
 ```
 
@@ -61,10 +62,12 @@ build/uvl
 
 The native binary starts its own internal FUSE mode by re-executing itself as
 `uvl __mount ...`, so there is no separate `uvl_fuse` binary in the CMake build.
+The Python wheel bundles this binary at `uvl/native/uvl` so users do not need to
+compile it during install.
 
-## Mount A Package Manager
+## Mount A Tool
 
-Register the package manager binary and the dependency directory it owns:
+Register the tool binary and the dependency directory it owns:
 
 ```bash
 uvl --fuse bun --mnt node_modules
@@ -79,7 +82,7 @@ uvl --fuse bun --mnt node_modules
 Unmount it first with `uvl --unmnt node_modules`.
 ```
 
-Then run the package manager through `uvl` when dependencies may change:
+Then run the tool through `uvl` when dependencies may change:
 
 ```bash
 uvl bun install
@@ -87,7 +90,7 @@ uvl bun add vite
 uvl bun remove vite
 ```
 
-After the package manager finishes, `uvl` scans the dependency directory, moves
+After the tool finishes, `uvl` scans the dependency directory, moves
 physical files into `~/.uvl/store/bun/objects`, updates the project `.uvl`
 binary manifest, clears the local directory, and mounts the
 virtual view back at `node_modules`.
@@ -154,11 +157,12 @@ After unmounting, the mount point is just a normal directory again.
 ## Commands
 
 ```bash
-uvl --fuse <tool> --mnt <dir>    Register a package manager mount directory
-uvl <tool> [args...]              Run a mounted package manager
+uvl --fuse <tool> --mnt <dir>    Register a tool mount directory
+uvl --fiss <tool>                Remove a tool from ~/.uvl/config.json
+uvl <tool> [args...]              Run a mounted tool
 uvl --unmnt <dir>                 Unmount a virtualized directory
 uvl --status                      Show current project mount status
-uvl --list                        List registered package manager binaries
+uvl --list                        List registered tools
 uvl --has <tool>                  Check if a mounted tool is installed
 uvl --version                     Print the version
 ```
@@ -168,23 +172,25 @@ uvl --version                     Print the version
 ```bash
 uvl --fuse bun
 uvl --fuse uv
+uvl --fiss bun
 ```
 
 ## How It Works
 
 1. `uvl --fuse <tool> --mnt <dir>` saves a registration in
    `~/.uvl/config.json`.
-2. `uvl <tool> ...` runs the real package manager binary with the same
+2. `uvl --fiss <tool>` removes the tool from `~/.uvl/config.json`.
+3. `uvl <tool> ...` runs the real tool binary with the same
    arguments.
-3. If the registered entry directory exists and is not already mounted, `uvl`
+4. If the registered entry directory exists and is not already mounted, `uvl`
    scans the result.
-4. Files are content-addressed by SHA-256 and stored under
+5. Files are content-addressed by SHA-256 and stored under
    `~/.uvl/store/<tool>/objects`.
-5. A binary project `.uvl` manifest stores every mounted tool, mount directory,
+6. A binary project `.uvl` manifest stores every mounted tool, mount directory,
    and virtual path map for fast loading. One project can track entries such as
    `.venv` and `node_modules` at the same time.
-6. A C FUSE daemon mounts a read-only virtual filesystem at the original
+7. A C FUSE daemon mounts a read-only virtual filesystem at the original
    dependency directory.
 
-The goal is simple: package managers keep their normal layout; projects stop
+The goal is simple: tools keep their normal layout; projects stop
 holding duplicate physical dependency trees.

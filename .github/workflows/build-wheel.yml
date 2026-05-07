@@ -1,0 +1,37 @@
+name: Build Linux wheel
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  linux-wheel:
+    runs-on: ubuntu-latest
+    container:
+      image: quay.io/pypa/manylinux_2_28_x86_64
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system deps
+        run: |
+          dnf -y install fuse3-devel openssl-devel pkgconfig cmake make
+
+      - name: Build wheel
+        run: |
+          /opt/python/cp312-cp312/bin/python -m pip install -U build hatchling wheel auditwheel
+          rm -rf build dist wheelhouse
+          /opt/python/cp312-cp312/bin/python -m build --wheel
+
+      - name: Audit and repair wheel
+        run: |
+          auditwheel show dist/*.whl
+          auditwheel repair dist/*.whl -w wheelhouse
+
+      - name: Upload wheel artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: uvl-linux-wheel
+          path: wheelhouse/*.whl

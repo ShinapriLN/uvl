@@ -19,6 +19,7 @@ check: build
 	$(BUILD_DIR)/uvl --help >/dev/null
 
 wheel:
+	$(MAKE) build
 	$(UV) build --wheel
 
 clean:

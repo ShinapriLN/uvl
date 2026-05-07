@@ -1,3 +1,4 @@
+import os
 import shutil
 import subprocess
 import sys
@@ -11,34 +12,33 @@ from .store import get_tool_store, hash_file
 from .ui import display_path
 
 
-def fuse_source_path():
-    return Path(__file__).parent / "native" / "fuse.c"
+def packaged_native_binary():
+    return Path(__file__).parent / "native" / "uvl"
 
 
 def ensure_fuse_binary():
-    c_src_path = fuse_source_path()
-    if not c_src_path.exists():
-        error(f"FUSE source not found at {c_src_path}")
+    packaged_bin = packaged_native_binary()
+    repo_bin = Path(__file__).resolve().parents[2] / "build" / "uvl"
+    source_bin = packaged_bin if packaged_bin.exists() else repo_bin
+    if not source_bin.exists():
+        error(f"Native binary not found at {packaged_bin} or {repo_bin}")
+        error("Build the native binary first with `make build`, or install a prebuilt wheel.")
         sys.exit(1)
 
-    c_hash = hash_file(c_src_path)[:12]
-    fuse_bin = BIN_ROOT / f"uvl_fuse_{c_hash}"
+    c_hash = hash_file(source_bin)[:12]
+    fuse_bin = BIN_ROOT / f"uvl_{c_hash}"
     if fuse_bin.exists():
-        step(f"Using cached C FUSE engine: {fuse_bin}")
+        step(f"Using cached native engine: {fuse_bin}")
         return fuse_bin
 
-    step("Compiling C FUSE engine")
+    step("Preparing native engine from bundled binary")
     BIN_ROOT.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(source_bin, fuse_bin)
     try:
-        pkg_out = subprocess.check_output(["pkg-config", "fuse3", "--cflags", "--libs"], text=True).strip()
-        compile_cmd = ["gcc", "-Wall", "-Wextra", "-O2", str(c_src_path), "-o", str(fuse_bin)]
-        compile_cmd.extend(pkg_out.split())
-        subprocess.run(compile_cmd, check=True)
-    except Exception as exc:
-        error(f"Failed to compile FUSE engine: {exc}")
-        error("Install gcc, pkg-config, and libfuse3 development headers.")
-        sys.exit(1)
-    ok(f"Compiled C FUSE engine: {fuse_bin}")
+        os.chmod(fuse_bin, 0o755)
+    except OSError:
+        pass
+    ok(f"Prepared native engine: {fuse_bin}")
     return fuse_bin
 
 

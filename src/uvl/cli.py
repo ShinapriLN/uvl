@@ -3,7 +3,7 @@ import shutil
 import sys
 from pathlib import Path
 
-from .config import DEFAULT_ENTRIES, get_registration, load_config, register_tool_config
+from .config import DEFAULT_ENTRIES, get_registration, load_config, register_tool_config, unregister_tool_config
 from .fuse import is_mountpoint, unmount_target
 from .log import error, ok, step
 from .manifest import read_metadata
@@ -26,7 +26,7 @@ def register_tool(tool, entry):
     store = get_tool_store(tool)
 
     step(f"Resolved '{tool}' binary: {exe_path}")
-    ok(f"{tool} has been mounted with uvl.")
+    ok(f"{tool} has been fused with uvl.")
     print(f"👍 now you can use `uvl {tool} ...` with any {tool} arguments.")
     print(f"✨ {entry} will physically store at {display_home_path(store)}")
     print()
@@ -39,7 +39,7 @@ def print_status():
     if not manifest_path.exists():
         print("Project status: not initialized")
         print("No .uvl manifest exists in this directory.")
-        print("Run a registered package manager through uvl to create one.")
+        print("Run a registered tool through uvl to create one.")
         return
 
     try:
@@ -68,16 +68,24 @@ def print_list():
         print(tool)
 
 
+def unregister_tool(tool):
+    if not unregister_tool_config(tool):
+        print(f"No registration found for '{tool}'.", file=sys.stderr)
+        sys.exit(1)
+    ok(f"Removed '{tool}' from ~/.uvl/config.json")
+
+
 def print_help():
     print("uvl: virtual dependency directories backed by a shared FUSE store")
     print()
     print("Usage:")
-    print("  uvl --fuse <tool> --mnt <dir>     Register a package manager mount directory")
-    print("  uvl <tool> [args...]              Run the package manager through uvl")
+    print("  uvl --fuse <tool> --mnt <dir>     Register a tool mount directory")
+    print("  uvl --fiss <tool>                 Remove a tool from ~/.uvl/config.json")
+    print("  uvl <tool> [args...]              Run the tool through uvl")
     print("  uvl --unmnt <dir>                 Unmount a virtualized dependency directory")
     print("  uvl --status                      Show current project mount status")
-    print("  uvl --list                        List registered package manager binaries")
-    print("  uvl --has <tool>                  Check whether a tool is mounted and installed")
+    print("  uvl --list                        List registered tools")
+    print("  uvl --has <tool>                  Check whether a tool is registered and installed")
     print("  uvl --version, -v                 Print version")
     print()
     print("Example:")
@@ -91,6 +99,7 @@ def parse_args(argv):
     parser.add_argument("--version", "-v", action="store_true")
     parser.add_argument("--fuse")
     parser.add_argument("--mnt")
+    parser.add_argument("--fiss")
     parser.add_argument("--unmnt")
     parser.add_argument("--has")
     parser.add_argument("--status", action="store_true")
@@ -117,6 +126,10 @@ def main():
             print("Usage: uvl --fuse <tool> --mnt <dependency-dir>", file=sys.stderr)
             sys.exit(1)
         register_tool(mount_tool, entry)
+        sys.exit(0)
+
+    if args.fiss:
+        unregister_tool(args.fiss)
         sys.exit(0)
 
     if args.unmnt:

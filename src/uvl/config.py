@@ -40,3 +40,12 @@ def register_tool_config(tool, entry):
     config = load_config()
     config["registrations"][tool] = {"entry": entry}
     save_config(config)
+
+
+def unregister_tool_config(tool):
+    config = load_config()
+    if tool in config["registrations"]:
+        del config["registrations"][tool]
+        save_config(config)
+        return True
+    return False

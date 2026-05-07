@@ -219,6 +219,24 @@ static void save_config(Config *config) {
     fclose(f);
 }
 
+static int unregister_tool_config(const char *tool) {
+    Config config;
+    load_config(&config);
+    size_t write = 0;
+    int removed = 0;
+    for (size_t read = 0; read < config.len; read++) {
+        if (strcmp(config.items[read].tool, tool) == 0) {
+            removed = 1;
+            continue;
+        }
+        if (write != read) config.items[write] = config.items[read];
+        write++;
+    }
+    config.len = write;
+    if (removed) save_config(&config);
+    return removed;
+}
+
 static const char *default_entry(const char *tool) {
     if (strcmp(tool, "bun") == 0) return "node_modules";
     if (strcmp(tool, "npm") == 0) return "node_modules";
@@ -282,7 +300,7 @@ static void register_tool(const char *tool, const char *entry) {
     ensure_store(tool);
 
     printf("[uvl] Resolved '%s' binary: %s\n", tool, exe_path);
-    printf("✅ %s has been mounted with uvl.\n", tool);
+    printf("✅ %s has been fused with uvl.\n", tool);
     printf("👍 now you can use `uvl %s ...` with any %s arguments.\n", tool, tool);
     printf("✨ %s will physically store at ~/.uvl/store/%s\n\n", entry, tool);
     printf("💥 Caution: While a directory is mounted by uvl, avoid deleting or modifying it directly.\n");
@@ -920,7 +938,7 @@ static int print_project_status(void) {
     if (!f) {
         puts("Project status: not initialized");
         puts("No .uvl manifest exists in this directory.");
-        puts("Run a registered package manager through uvl to create one.");
+        puts("Run a registered tool through uvl to create one.");
         return 0;
     }
 
@@ -972,12 +990,13 @@ static void print_help(void) {
     puts("uvl: virtual dependency directories backed by a shared FUSE store");
     puts("");
     puts("Usage:");
-    puts("  uvl --fuse <tool> --mnt <dir>   Register a package manager mount directory");
-    puts("  uvl <tool> [args...]              Run the package manager through uvl");
+    puts("  uvl --fuse <tool> --mnt <dir>   Register a tool mount directory");
+    puts("  uvl --fiss <tool>               Remove a tool from ~/.uvl/config.json");
+    puts("  uvl <tool> [args...]            Run the tool through uvl");
     puts("  uvl --unmnt <dir>                 Unmount a virtualized dependency directory");
     puts("  uvl --status                      Show current project mount status");
-    puts("  uvl --list                        List registered package manager binaries");
-    puts("  uvl --has <tool>                  Check whether a tool is mounted and installed");
+    puts("  uvl --list                        List registered tools");
+    puts("  uvl --has <tool>                  Check whether a tool is registered and installed");
     puts("  uvl --version, -v                 Print version");
 }
 
@@ -1000,6 +1019,15 @@ int main(int argc, char **argv) {
         if (!entry) entry = default_entry(argv[2]);
         if (!entry) die("Usage: uvl --fuse <tool> --mnt <dependency-dir>");
         register_tool(argv[2], entry);
+        return 0;
+    }
+    if (strcmp(argv[1], "--fiss") == 0) {
+        if (argc < 3) die("Usage: uvl --fiss <tool>");
+        if (!unregister_tool_config(argv[2])) {
+            fprintf(stderr, "[uvl] No registration found for '%s'\n", argv[2]);
+            return 1;
+        }
+        printf("[uvl] ✅ Removed '%s' from ~/.uvl/config.json\n", argv[2]);
         return 0;
     }
     if (strcmp(argv[1], "--unmnt") == 0) {
