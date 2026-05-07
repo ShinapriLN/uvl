@@ -1,13 +1,10 @@
-name: Build Linux wheel
+name: Publish
 
 on:
   workflow_dispatch:
-  push:
-    tags:
-      - "v*"
 
 jobs:
-  linux-wheel:
+  build:
     runs-on: ubuntu-latest
     container:
       image: quay.io/pypa/manylinux_2_28_x86_64
@@ -15,30 +12,45 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install system deps
+      - name: Install deps
         run: |
           dnf -y install fuse3-devel openssl-devel pkgconfig cmake make
 
       - name: Build native binary
         run: |
           make build
+          ls -lh build/uvl
 
       - name: Build wheel
         run: |
-          /opt/python/cp312-cp312/bin/python -m pip install -U build hatchling wheel auditwheel
+          /opt/python/cp312-cp312/bin/python -m pip install -U build hatchling wheel auditwheel twine
+          rm -rf dist wheelhouse
           /opt/python/cp312-cp312/bin/python -m build --wheel
-
-      - name: Audit and repair wheel
-        run: |
           auditwheel show dist/*.whl
           auditwheel repair dist/*.whl -w wheelhouse
+          /opt/python/cp312-cp312/bin/python -m twine check wheelhouse/*.whl
 
       - name: Upload wheel artifact
         uses: actions/upload-artifact@v4
         with:
-          name: uvl-linux-wheel
+          name: wheelhouse
           path: wheelhouse/*.whl
-          
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Download wheel artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: wheelhouse
+          path: wheelhouse
+
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
