@@ -109,16 +109,25 @@ def create_virtual_fs(tool, target_dir, remount=False):
 
     step(f"Mounting virtual filesystem with {file_count} files")
     process = subprocess.Popen(
-        [str(fuse_bin), str(manifest_path), str(target)],
+        [str(fuse_bin), "__mount", str(manifest_path), str(target)],
         stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
+        stderr=subprocess.PIPE,
         start_new_session=True,
+        text=True,
     )
     if not wait_for_mount(process, target):
         if is_mountpoint(target):
             ok(f"Successfully remounted virtual '{shown_target}'" if remount else f"Successfully mounted virtual '{shown_target}'")
             return True
+        stderr_output = ""
+        if process.stderr is not None:
+            try:
+                stderr_output = process.stderr.read().strip()
+            except Exception:
+                stderr_output = ""
         warn("Mount failed; restoring normal directory from .uvl manifest")
+        if stderr_output:
+            step(f"Native mount error: {stderr_output}")
         restore_from_manifest(manifest_path, target)
         error(f"Failed to mount virtual '{shown_target}'. Restored the normal directory.")
         return False

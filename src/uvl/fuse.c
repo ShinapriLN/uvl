@@ -1,4 +1,4 @@
-#define FUSE_USE_VERSION 31
+
 
 #include <errno.h>
 #include <fcntl.h>
@@ -8,39 +8,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/stat.h>
+
 #include <unistd.h>
 
-#define MAX_PATH_LEN 1024
-#define UVL_MAGIC "UVL3"
-#define UVL_KIND_DIR 1
-#define UVL_KIND_FILE 2
-#define UVL_KIND_SYMLINK 3
 
-typedef struct {
-    uint32_t tool_len;
-    uint32_t entry_len;
-    uint32_t record_count;
-} __attribute__((packed)) MapMeta;
 
-typedef struct {
-    uint8_t kind;
-    uint32_t mode;
-    uint32_t v_len;
-    uint32_t p_len;
-} __attribute__((packed)) MapRecord;
 
-typedef struct Node {
-    char name[256];
-    int is_dir;
-    int is_symlink;
-    mode_t mode;
-    char p_path[MAX_PATH_LEN];
-    struct Node *child;
-    struct Node *next;
-} Node;
 
-static Node *root = NULL;
+
 
 Node *create_node(const char *name, int is_dir) {
     Node *n = (Node *)calloc(1, sizeof(Node));

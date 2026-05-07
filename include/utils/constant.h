@@ -1,0 +1,22 @@
+#ifndef UTILS_CONSTANT_H
+#define UTILS_CONSTANT_H
+
+#define UVL_VERSION "0.0.1"
+
+#define UVL_MAGIC "UVL3"
+#define UVL_KIND_DIR 1
+#define UVL_KIND_FILE 2
+#define UVL_KIND_SYMLINK 3
+
+#define MAX_REGISTRATIONS 128
+#define MAX_NAME_LEN 256
+#define MAX_PATH_LEN 1024
+
+// FUSE
+#define FUSE_USE_VERSION 31
+
+
+#define UVL_PROJECT_MAGIC "UVL3"
+
+
+#endif

@@ -166,7 +166,7 @@ def build_mapping(tool, target):
 def restore_from_manifest(manifest_path, target):
     from .fuse import is_mountpoint, unmount_target
 
-    target = Path(target)
+    target = Path(target).expanduser()
     entry = target.name
     if is_mountpoint(target) and not unmount_target(target, quiet=True):
         raise RuntimeError(f"cannot restore {target}: still mounted")
@@ -175,9 +175,28 @@ def restore_from_manifest(manifest_path, target):
     if entry not in entries:
         raise ValueError(f"{manifest_path} has no entry named {entry}")
 
-    if target.exists():
-        shutil.rmtree(target)
-    target.mkdir(parents=True, exist_ok=True)
+    if target.exists() or target.is_symlink():
+        if target.is_dir() and not target.is_symlink():
+            shutil.rmtree(target, ignore_errors=True)
+        else:
+            try:
+                target.unlink()
+            except FileNotFoundError:
+                pass
+    try:
+        target.mkdir(parents=True, exist_ok=True)
+    except FileExistsError:
+        if target.is_dir() and not target.is_symlink():
+            pass
+        else:
+            try:
+                if target.is_symlink() or target.is_file():
+                    target.unlink()
+                else:
+                    shutil.rmtree(target, ignore_errors=True)
+            except FileNotFoundError:
+                pass
+            target.mkdir(parents=True, exist_ok=True)
 
     for kind, virtual_path, physical_path, mode in entries[entry]["records"]:
         rel = virtual_path.lstrip("/")

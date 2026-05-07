@@ -10,20 +10,42 @@ find_package(PkgConfig REQUIRED)
 pkg_check_modules(FUSE3 REQUIRED fuse3)
 pkg_check_modules(OPENSSL REQUIRED openssl)
 
-add_executable(uvl src/uvl/native/uvl.c)
-target_include_directories(uvl PRIVATE ${FUSE3_INCLUDE_DIRS} ${OPENSSL_INCLUDE_DIRS})
-target_compile_definitions(uvl PRIVATE _DEFAULT_SOURCE _XOPEN_SOURCE=700)
-target_compile_options(
-    uvl
-    PRIVATE
-        -Wall
-        -Wextra
-        -Wno-deprecated-declarations
-        -Wno-format-truncation
-        ${FUSE3_CFLAGS_OTHER}
-        ${OPENSSL_CFLAGS_OTHER}
+
+file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS
+    "src/uvl/*.c"
 )
-target_link_libraries(uvl PRIVATE ${FUSE3_LIBRARIES} ${OPENSSL_LIBRARIES})
-target_link_directories(uvl PRIVATE ${FUSE3_LIBRARY_DIRS} ${OPENSSL_LIBRARY_DIRS})
+list(REMOVE_ITEM SOURCES
+    "src/uvl/fuse.c"
+    "src/uvl/uvl.c"
+)
+add_executable(uvl ${SOURCES})
+target_include_directories(uvl PUBLIC
+    include
+)
+target_include_directories(uvl PRIVATE 
+    ${FUSE3_INCLUDE_DIRS} 
+    ${OPENSSL_INCLUDE_DIRS}
+)
+target_compile_definitions(uvl PRIVATE 
+    _DEFAULT_SOURCE 
+    _XOPEN_SOURCE=700
+)
+target_compile_options(uvl PRIVATE
+    -Wall
+    -Wextra
+    -Wno-deprecated-declarations
+    -Wno-format-truncation
+    ${FUSE3_CFLAGS_OTHER}
+    ${OPENSSL_CFLAGS_OTHER}
+)
+target_link_libraries(uvl PRIVATE 
+    ${FUSE3_LIBRARIES} 
+    ${OPENSSL_LIBRARIES}
+)
+target_link_directories(uvl PRIVATE 
+    src/
+    ${FUSE3_LIBRARY_DIRS} 
+    ${OPENSSL_LIBRARY_DIRS}
+)
 
 install(TARGETS uvl RUNTIME DESTINATION bin)

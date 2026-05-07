@@ -3,4 +3,4 @@ try:
 
     __version__ = metadata.version("uvl")
 except (metadata.PackageNotFoundError, ImportError):
-    __version__ = "0.0.1-dev"
+    __version__ = "0.0.2"
