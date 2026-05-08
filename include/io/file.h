@@ -20,6 +20,8 @@ int move_file(const char *src, const char *dst, mode_t mode);
 
 int build_mapping(const char *tool, const char *target, char *manifest, size_t manifest_len, ScanStats *stats);
 
+int rewrite_manifest_from_tree(const char *manifest, const char *tool, const char *entry, Node *tree_root);
+
 void sha256_file(const char *path, char hex[65]);
 
 void escape(FILE *f, const char *s);

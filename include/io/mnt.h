@@ -18,4 +18,10 @@ int create_virtual_fs(const char *self, const char *tool, const char *target, in
 
 int mount_mode(int argc, char **argv);
 
+const char *mount_manifest_path(void);
+
+const char *mount_tool_name(void);
+
+const char *mount_entry_name(void);
+
 #endif

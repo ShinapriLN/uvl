@@ -59,10 +59,11 @@ void insert_path(const char *v_path, const char *p_path, int is_dir, int is_syml
     strncpy(path_copy, v_path, MAX_PATH_LEN - 1);
     path_copy[MAX_PATH_LEN - 1] = '\0';
 
-    char *token = strtok(path_copy, "/");
+    char *saveptr = NULL;
+    char *token = strtok_r(path_copy, "/", &saveptr);
     Node *curr = root;
     while (token) {
-        char *next_token = strtok(NULL, "/");
+        char *next_token = strtok_r(NULL, "/", &saveptr);
         Node *child = find_child(curr, token);
         if (!child) {
             child = create_node(token, next_token != NULL || is_dir);
@@ -115,17 +116,16 @@ void scan_dir(const char *tool, const char *root_dir, const char *dir, const cha
             }
         } else if (S_ISDIR(st.st_mode)) {
             write_record(map, UVL_KIND_DIR, vpath, "", st.st_mode);
+            stats->files++;
             scan_dir(tool, root_dir, path, vpath, map, stats);
         } else if (S_ISREG(st.st_mode)) {
             char hash[65];
             sha256_file(path, hash);
 
             char store[MAX_PATH_LEN];
-            char obj_dir[MAX_PATH_LEN];
             char obj_path[MAX_PATH_LEN];
             store_path(store, sizeof(store), tool);
-            path_join(obj_dir, sizeof(obj_dir), store, "objects");
-            path_join(obj_path, sizeof(obj_path), obj_dir, hash);
+            path_join(obj_path, sizeof(obj_path), store, hash);
 
             if (access(obj_path, F_OK) == 0) {
                 unlink(path);

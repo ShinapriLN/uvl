@@ -58,6 +58,7 @@ typedef struct Node {
     int is_symlink;
     mode_t mode;
     char p_path[MAX_PATH_LEN];
+    int dirty;
     struct Node *child;
     struct Node *next;
 } Node;

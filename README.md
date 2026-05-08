@@ -146,7 +146,6 @@ bun install v1.2.10 (db2e7d7f)
 [UVL] [ INFO ] Virtualized 27.50 MB into ~/.uvl/store/bun.
 
 ❯ uvl bun add vite
-[uvl] Restoring mounted entry 'node_modules' before running bun
 bun add v1.2.10 (db2e7d7f)
 
 installed vite@8.0.11 with binaries:
@@ -228,6 +227,24 @@ Project status:
     mounted: yes
 ```
 
+## Disk Usage
+
+The point is to keep dependency trees mounted in place while the physical
+files live in the shared store:
+
+```bash
+find ~/Documents -type d -name node_modules -prune -exec du -sh {} +
+0    ~/Documents/proj/app/node_modules
+0    ~/Documents/ai/project-b/node_modules
+
+find ~/Documents -type d -name .venv -prune -exec du -sh {} +
+0    ~/Documents/proj/app/.venv
+0    ~/Documents/ai/project-b/.venv
+```
+
+Those directories still work normally, but the bytes are stored once under
+`~/.uvl/store/<manager>`.
+
 ## Unmount
 
 Mounted dependency directories are intentionally read-only. If you want to
@@ -249,7 +266,7 @@ After unmounting, the mount point is just a normal directory again.
 4. If the registered entry directory exists, `uvl` restores the mounted view
    before the tool changes files.
 5. Files are content-addressed by SHA-256 and stored under
-   `~/.uvl/store/<tool>/objects`.
+   `~/.uvl/store/<tool>`.
 6. A binary project `.uvl` manifest stores every mounted tool and mount
    directory for fast loading. One project can track multiple entries such as
    `.venv` and `node_modules` at the same time.

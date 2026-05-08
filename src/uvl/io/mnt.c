@@ -25,9 +25,35 @@ static const struct fuse_operations uvl_oper = {
     .readdir = uvl_readdir,
     .open = uvl_open,
     .read = uvl_read,
+    .write = uvl_write,
+    .mkdir = uvl_mkdir,
+    .rmdir = uvl_rmdir,
+    .unlink = uvl_unlink,
+    .rename = uvl_rename,
+    .symlink = uvl_symlink,
+    .chmod = uvl_chmod,
+    .utimens = uvl_utimens,
+    .create = uvl_create,
+    .truncate = uvl_truncate,
     .readlink = uvl_readlink,
     .release = uvl_release,
 };
+
+static char active_manifest[MAX_PATH_LEN];
+static char active_tool[MAX_NAME_LEN];
+static char active_entry[MAX_PATH_LEN];
+
+const char *mount_manifest_path(void) {
+    return active_manifest;
+}
+
+const char *mount_tool_name(void) {
+    return active_tool;
+}
+
+const char *mount_entry_name(void) {
+    return active_entry;
+}
 
 int is_mountpoint(const char *path) {
     pid_t pid = fork();
@@ -187,6 +213,8 @@ int mount_mode(int argc, char **argv) {
     }
 
     const char *wanted_entry = path_basename_const(argv[3]);
+    snprintf(active_manifest, sizeof(active_manifest), "%s", argv[2]);
+    snprintf(active_entry, sizeof(active_entry), "%s", wanted_entry);
     uint32_t record_count = 0;
     int found = 0;
 
@@ -211,6 +239,7 @@ int mount_mode(int argc, char **argv) {
 
         if (strcmp(entry, wanted_entry) == 0) {
             record_count = meta.record_count;
+            snprintf(active_tool, sizeof(active_tool), "%s", tool);
             found = 1;
             break;
         }
@@ -248,6 +277,6 @@ int mount_mode(int argc, char **argv) {
     }
     fclose(f);
 
-    char *fuse_argv[] = {argv[0], argv[3], NULL};
-    return fuse_main(2, fuse_argv, &uvl_oper, NULL);
+    char *fuse_argv[] = {argv[0], "-s", argv[3], NULL};
+    return fuse_main(3, fuse_argv, &uvl_oper, NULL);
 }

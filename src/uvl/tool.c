@@ -69,45 +69,6 @@ static int run_external_tool(const char *tool, int argc, char **argv, int quiet)
     return WEXITSTATUS(status);
 }
 
-static int run_external_tool_capture_success(const char *tool, int argc, char **argv) {
-    FILE *capture = tmpfile();
-    if (!capture) return run_external_tool(tool, argc, argv, 0);
-
-    char **exec_args = calloc((size_t)argc + 2, sizeof(char *));
-    if (!exec_args) {
-        fclose(capture);
-        return 1;
-    }
-    exec_args[0] = (char *)tool;
-    for (int i = 0; i < argc; i++) exec_args[i + 1] = argv[i];
-    exec_args[argc + 1] = NULL;
-
-    pid_t pid = fork();
-    if (pid == 0) {
-        int fd = fileno(capture);
-        dup2(fd, STDOUT_FILENO);
-        dup2(fd, STDERR_FILENO);
-        execvp(tool, exec_args);
-        _exit(127);
-    }
-    free(exec_args);
-
-    int status = 0;
-    waitpid(pid, &status, 0);
-    int code = WIFEXITED(status) ? WEXITSTATUS(status) : 1;
-    if (code == 0) {
-        rewind(capture);
-        char buffer[8192];
-        size_t n;
-        while ((n = fread(buffer, 1, sizeof(buffer), capture)) > 0) {
-            fwrite(buffer, 1, n, stdout);
-        }
-        fflush(stdout);
-    }
-    fclose(capture);
-    return code;
-}
-
 int run_tool(const char *tool, int argc, char **argv) {
     Config config;
     load_config(&config);
@@ -133,18 +94,7 @@ int run_tool(const char *tool, int argc, char **argv) {
 
     int was_mounted = is_mountpoint(target);
     if (was_mounted) {
-        int status = run_external_tool_capture_success(tool, argc, argv);
-        if (status == 0) return 0;
-
-        LOG_INFO("Restoring mounted entry '%s' before retry.", reg->entry);
-        if (!unmount_target(target, 1)) {
-            fprintf(stderr, "Error: failed to unmount '%s' before running command.\n", reg->entry);
-            return 1;
-        }
-        if (restore_project_manifest(manifest, target) != 0) {
-            fprintf(stderr, "Error: failed to restore '%s' from .uvl manifest.\n", reg->entry);
-            return 1;
-        }
+        return run_external_tool(tool, argc, argv, 0);
     }
 
     int status = run_external_tool(tool, argc, argv, 0);
@@ -187,8 +137,5 @@ int ensure_store(const char *tool) {
     char path[MAX_PATH_LEN];
     store_path(path, sizeof(path), tool);
     if (mkdir_p(path) != 0) return -1;
-    char child[MAX_PATH_LEN];
-    path_join(child, sizeof(child), path, "objects");
-    if (mkdir_p(child) != 0) return -1;
     return 0;
 }

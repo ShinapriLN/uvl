@@ -391,6 +391,68 @@ int build_mapping(const char *tool, const char *target, char *manifest, size_t m
     return 0;
 }
 
+static uint32_t count_manifest_nodes(Node *node) {
+    if (!node) return 0;
+    uint32_t count = 1;
+    if (node->is_dir) {
+        for (Node *child = node->child; child; child = child->next) {
+            count += count_manifest_nodes(child);
+        }
+    }
+    return count;
+}
+
+static void write_tree_records(FILE *map, Node *node, const char *vpath) {
+    if (!node) return;
+    if (node->is_symlink) {
+        write_record(map, UVL_KIND_SYMLINK, vpath, node->p_path, node->mode);
+    } else if (node->is_dir) {
+        write_record(map, UVL_KIND_DIR, vpath, "", node->mode);
+        for (Node *child = node->child; child; child = child->next) {
+            char child_path[MAX_PATH_LEN];
+            if (strcmp(vpath, "/") == 0) snprintf(child_path, sizeof(child_path), "/%s", child->name);
+            else snprintf(child_path, sizeof(child_path), "%s/%s", vpath, child->name);
+            write_tree_records(map, child, child_path);
+        }
+    } else {
+        write_record(map, UVL_KIND_FILE, vpath, node->p_path, node->mode);
+    }
+}
+
+int rewrite_manifest_from_tree(const char *manifest, const char *tool, const char *entry, Node *tree_root) {
+    PreservedEntry preserved[MAX_REGISTRATIONS] = {0};
+    size_t preserved_count = 0;
+    if (read_preserved_entries(manifest, entry, preserved, &preserved_count) != 0) {
+        return -1;
+    }
+
+    FILE *map = fopen(manifest, "wb");
+    if (!map) {
+        free_preserved_entries(preserved, preserved_count);
+        return -1;
+    }
+
+    ProjectHeader header = {.entry_count = (uint32_t)(preserved_count + 1)};
+    ProjectMeta meta = {
+        .tool_len = (uint32_t)strlen(tool),
+        .entry_len = (uint32_t)strlen(entry),
+        .record_count = count_manifest_nodes(tree_root),
+    };
+
+    fwrite(UVL_PROJECT_MAGIC, 1, 4, map);
+    fwrite(&header, sizeof(header), 1, map);
+    for (size_t i = 0; i < preserved_count; i++) {
+        fwrite(preserved[i].data, 1, preserved[i].len, map);
+    }
+    fwrite(&meta, sizeof(meta), 1, map);
+    fwrite(tool, 1, meta.tool_len, map);
+    fwrite(entry, 1, meta.entry_len, map);
+    write_tree_records(map, tree_root, "/");
+    fclose(map);
+    free_preserved_entries(preserved, preserved_count);
+    return 0;
+}
+
 void sha256_file(const char *path, char hex[65]) {
     FILE *f = fopen(path, "rb");
     if (!f) {LOG_ERROR("Could not open %s", path); exit(1);}

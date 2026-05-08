@@ -1,6 +1,6 @@
 [project]
 name = "uvl-fuse"
-version = "0.0.2"
+version = "0.0.3"
 description = "Virtual dependency directories for package managers, backed by a shared FUSE store."
 dependencies = []
 requires-python = ">=3.8"
