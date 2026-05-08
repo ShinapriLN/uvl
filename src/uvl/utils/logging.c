@@ -19,7 +19,7 @@ void print_help(void) {
     puts("uvl: virtual dependency directories backed by a shared FUSE store");
     puts("");
     puts("Usage:");
-    puts("  uvl --fuse <tool> --mnt <dir>   Register/fustion a tool mount directory");
+    puts("  uvl --fuse <tool> --mnt <dir>   Register/fusion a tool mount directory");
     puts("  uvl --fiss <tool>               Remove/fission a tool out of uvl");
     puts("  uvl <tool> [args...]            Run the tool through uvl");
     puts("  uvl --unmnt <dir>               Unmount a virtualized dependency directory");

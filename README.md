@@ -35,7 +35,7 @@ From this repository:
 uvl: virtual dependency directories backed by a shared FUSE store
 
 Usage:
-  uvl --fuse <tool> --mnt <dir>   Register/fustion a tool mount directory
+  uvl --fuse <tool> --mnt <dir>   Register/fusion a tool mount directory
   uvl --fiss <tool>               Remove/fission a tool out of uvl
   uvl <tool> [args...]            Run the tool through uvl
   uvl --unmnt <dir>               Unmount a virtualized dependency directory

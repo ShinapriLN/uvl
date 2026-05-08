@@ -13,6 +13,8 @@
 #include "io/mnt.h"
 #include "uvl/project.h"
 
+#define UVL_READONLY_HANDLE ((uint64_t)-1)
+
 Node *root = NULL;
 
 Node *create_node(const char *name, int is_dir) {
@@ -246,10 +248,12 @@ int uvl_open(const char *path, struct fuse_file_info *fi) {
     Node *n = find_node(path);
     if (!n || n->is_dir || n->is_symlink) return -ENOENT;
     int accmode = fi->flags & O_ACCMODE;
-    if (accmode != O_RDONLY) {
-        int writable = ensure_writable_node(n, (fi->flags & O_TRUNC) != 0);
-        if (writable != 0) return writable;
+    if (accmode == O_RDONLY) {
+        fi->fh = UVL_READONLY_HANDLE;
+        return 0;
     }
+    int writable = ensure_writable_node(n, (fi->flags & O_TRUNC) != 0);
+    if (writable != 0) return writable;
     int fd = open(n->p_path, fi->flags);
     if (fd == -1) return -errno;
     fi->fh = fd;
@@ -257,9 +261,19 @@ int uvl_open(const char *path, struct fuse_file_info *fi) {
 }
 
 int uvl_read(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi) {
-    (void)path;
-    int res = pread(fi->fh, buf, size, offset);
+    if (fi->fh != UVL_READONLY_HANDLE) {
+        int res = pread(fi->fh, buf, size, offset);
+        if (res == -1) res = -errno;
+        return res;
+    }
+
+    Node *n = find_node(path);
+    if (!n || n->is_dir || n->is_symlink) return -ENOENT;
+    int fd = open(n->p_path, O_RDONLY);
+    if (fd == -1) return -errno;
+    int res = pread(fd, buf, size, offset);
     if (res == -1) res = -errno;
+    close(fd);
     return res;
 }
 
@@ -274,7 +288,7 @@ int uvl_readlink(const char *path, char *buf, size_t size) {
 
 int uvl_release(const char *path, struct fuse_file_info *fi) {
     Node *n = find_node(path);
-    close(fi->fh);
+    if (fi->fh != UVL_READONLY_HANDLE) close(fi->fh);
     if (n && n->dirty) return commit_node(n);
     return 0;
 }
