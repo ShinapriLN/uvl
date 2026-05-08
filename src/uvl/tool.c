@@ -2,6 +2,8 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/wait.h>
+#include <fcntl.h>
+#include <stdio.h>
 
 #include "uvl/tool.h"
 #include "utils/command.h"
@@ -25,7 +27,7 @@ void register_tool(const char *tool, const char *entry) {
     load_config(&config);
     Registration *reg = find_registration(&config, tool);
     if (!reg) {
-        if (config.len >= MAX_REGISTRATIONS) LOG_ERROR("Too many registrations");
+        if (config.len >= MAX_REGISTRATIONS) {LOG_ERROR("Too many registrations"); exit(1);}
         reg = &config.items[config.len++];
     }
     snprintf(reg->tool, sizeof(reg->tool), "%s", tool);
@@ -39,18 +41,87 @@ void register_tool(const char *tool, const char *entry) {
     LOG_INFO("Run `uvl %s ...` to use it through uvl.", tool);
 }
 
+static int run_external_tool(const char *tool, int argc, char **argv, int quiet) {
+    char **exec_args = calloc((size_t)argc + 2, sizeof(char *));
+    if (!exec_args) return 1;
+    exec_args[0] = (char *)tool;
+    for (int i = 0; i < argc; i++) exec_args[i + 1] = argv[i];
+    exec_args[argc + 1] = NULL;
+
+    pid_t pid = fork();
+    if (pid == 0) {
+        if (quiet) {
+            int devnull = open("/dev/null", O_RDWR);
+            if (devnull >= 0) {
+                dup2(devnull, STDOUT_FILENO);
+                dup2(devnull, STDERR_FILENO);
+                close(devnull);
+            }
+        }
+        execvp(tool, exec_args);
+        _exit(127);
+    }
+    free(exec_args);
+
+    int status = 0;
+    waitpid(pid, &status, 0);
+    if (!WIFEXITED(status)) return 1;
+    return WEXITSTATUS(status);
+}
+
+static int run_external_tool_capture_success(const char *tool, int argc, char **argv) {
+    FILE *capture = tmpfile();
+    if (!capture) return run_external_tool(tool, argc, argv, 0);
+
+    char **exec_args = calloc((size_t)argc + 2, sizeof(char *));
+    if (!exec_args) {
+        fclose(capture);
+        return 1;
+    }
+    exec_args[0] = (char *)tool;
+    for (int i = 0; i < argc; i++) exec_args[i + 1] = argv[i];
+    exec_args[argc + 1] = NULL;
+
+    pid_t pid = fork();
+    if (pid == 0) {
+        int fd = fileno(capture);
+        dup2(fd, STDOUT_FILENO);
+        dup2(fd, STDERR_FILENO);
+        execvp(tool, exec_args);
+        _exit(127);
+    }
+    free(exec_args);
+
+    int status = 0;
+    waitpid(pid, &status, 0);
+    int code = WIFEXITED(status) ? WEXITSTATUS(status) : 1;
+    if (code == 0) {
+        rewind(capture);
+        char buffer[8192];
+        size_t n;
+        while ((n = fread(buffer, 1, sizeof(buffer), capture)) > 0) {
+            fwrite(buffer, 1, n, stdout);
+        }
+        fflush(stdout);
+    }
+    fclose(capture);
+    return code;
+}
+
 int run_tool(const char *tool, int argc, char **argv) {
     Config config;
     load_config(&config);
     Registration *reg = find_registration(&config, tool);
+
     if (!reg) {
         LOG_ERROR("'%s' is not mounted with uvl.", tool);
-        LOG_ERROR("Register it first with `uvl --fuse %s --mnt <dependency-dir>`.", tool);
-        return 1;
+        LOG_ERROR("Register it first with `%s`.", replace_string(FUSE_COMMAND, "<tool>", tool));
+        exit(1);
     }
+
     if (!command_exists(tool)) {
-        fprintf(stderr, "Error: '%s' not found in PATH.\n", tool);
-        return 1;
+        LOG_ERROR("'%s' not found in PATH.", tool);
+        exit(1);
     }
 
     char cwd[MAX_PATH_LEN];
@@ -62,7 +133,10 @@ int run_tool(const char *tool, int argc, char **argv) {
 
     int was_mounted = is_mountpoint(target);
     if (was_mounted) {
-        printf("[uvl] Restoring mounted entry '%s' before running %s\n", reg->entry, tool);
+        int status = run_external_tool_capture_success(tool, argc, argv);
+        if (status == 0) return 0;
+
+        LOG_INFO("Restoring mounted entry '%s' before retry.", reg->entry);
         if (!unmount_target(target, 1)) {
             fprintf(stderr, "Error: failed to unmount '%s' before running command.\n", reg->entry);
             return 1;
@@ -73,23 +147,8 @@ int run_tool(const char *tool, int argc, char **argv) {
         }
     }
 
-    char **exec_args = calloc((size_t)argc + 2, sizeof(char *));
-    exec_args[0] = (char *)tool;
-    for (int i = 0; i < argc; i++) exec_args[i + 1] = argv[i];
-    exec_args[argc + 1] = NULL;
-
-    pid_t pid = fork();
-    if (pid == 0) {
-        execvp(tool, exec_args);
-        _exit(127);
-    }
-    free(exec_args);
-
-    int status = 0;
-    waitpid(pid, &status, 0);
-    if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
-        return WIFEXITED(status) ? WEXITSTATUS(status) : 1;
-    }
+    int status = run_external_tool(tool, argc, argv, 0);
+    if (status != 0) return status;
 
     char self[MAX_PATH_LEN];
     ssize_t n = readlink("/proc/self/exe", self, sizeof(self) - 1);

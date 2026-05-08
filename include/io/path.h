@@ -27,4 +27,6 @@ void scan_dir(const char *tool, const char *root_dir, const char *dir, const cha
 
 void manifest_path(char *out, size_t out_len, const char *tool, const char *target);
 
+const char *basename_of(const char *path);
+
 #endif

@@ -2,20 +2,39 @@
 name = "uvl-fuse"
 version = "0.0.2"
 description = "Virtual dependency directories for package managers, backed by a shared FUSE store."
-readme = { file = "README.md", content-type = "text/markdown" }
 dependencies = []
 requires-python = ">=3.8"
+readme = { file = "README.md", content-type = "text/markdown" }
+license = { file = "LICENSE.md" }
 
 [project.scripts]
-uvl = "uvl.cli:main"
+uvl = "uvl._cli:main"
 
 [build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
 
-[tool.hatch.build.targets.wheel]
-packages = ["src/uvl"]
-force-include = { "build/uvl" = "uvl/native/uvl" }
-pure_python = false
-tag = "py3-none-linux_x86_64"
-artifacts = ["src/uvl/native/fuse.c", "src/uvl/native/uvl.c"]
+[tool.setuptools]
+package-dir = { "" = "python" }
+packages = ["uvl"]
+
+[tool.setuptools.package-data]
+uvl = ["bin/uvl"]
+
+[tool.cibuildwheel]
+build = "cp312-manylinux_x86_64"
+skip = "*-musllinux_* pp*"
+test-command = "uvl --version"
+
+[tool.cibuildwheel.linux]
+manylinux-x86_64-image = "manylinux_2_28"
+before-build = """
+dnf install -y fuse3-devel openssl-devel
+python -m pip install cmake
+rm -rf build python/uvl/bin
+make build
+test -x build/uvl
+mkdir -p python/uvl/bin
+cp build/uvl python/uvl/bin/uvl
+chmod +x python/uvl/bin/uvl
+"""

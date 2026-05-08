@@ -14,13 +14,7 @@ build: configure
 	$(CMAKE) --build $(BUILD_DIR)
 
 check: build
-	$(PYTHON) -m compileall -q src/uvl
-	PYTHONPATH=src $(PYTHON) -m uvl --help >/dev/null
 	$(BUILD_DIR)/uvl --help >/dev/null
-
-wheel:
-	$(MAKE) build
-	$(UV) build --wheel
 
 clean:
 	$(CMAKE) -E rm -rf $(BUILD_DIR) dist

@@ -60,12 +60,12 @@ void config_path(char *out, size_t out_len) {
 void save_config(Config *config) {
     char base[MAX_PATH_LEN];
     uvl_home(base, sizeof(base));
-    if (mkdir_p(base) != 0) LOG_ERROR("Could not create %s", base);
+    if (mkdir_p(base) != 0) {LOG_ERROR("Could not create %s", base); exit(1);}
 
     char path[MAX_PATH_LEN];
     config_path(path, sizeof(path));
     FILE *f = fopen(path, "w");
-    if (!f) LOG_ERROR("Could not write %s", path);
+    if (!f) {LOG_ERROR("Could not write %s", path); exit(1);}
 
     fputs("{\n  \"registrations\": {\n", f);
     for (size_t i = 0; i < config->len; i++) {

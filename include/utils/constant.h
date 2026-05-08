@@ -1,7 +1,7 @@
 #ifndef UTILS_CONSTANT_H
 #define UTILS_CONSTANT_H
 
-#define UVL_VERSION "0.0.1"
+#define UVL_VERSION "0.0.2"
 
 #define UVL_MAGIC "UVL3"
 #define UVL_KIND_DIR 1

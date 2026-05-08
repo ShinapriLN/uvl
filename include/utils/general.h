@@ -4,8 +4,10 @@
 
 bool streq(const char *str1, const char *str2);
 
-void slice_string(char *str, size_t i, size_t j);
+char *slice_string(const char *str, const size_t i, const size_t j);
 
-char *replace_string(char *str, char *sub_str);
+char *concat_string(const char *str1, const char *str2);
+
+char *replace_string(const char *str, const char *match, const char *replace);
 
 #endif

@@ -16,4 +16,6 @@ int spawn_mount(const char *self, const char *manifest, const char *target);
 
 int create_virtual_fs(const char *self, const char *tool, const char *target, int remount);
 
+int mount_mode(int argc, char **argv);
+
 #endif

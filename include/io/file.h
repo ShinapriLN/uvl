@@ -26,4 +26,8 @@ void escape(FILE *f, const char *s);
 
 void write_map(FILE *f, const char *kind, const char *vpath, const char *ppath, mode_t mode);
 
+void write_record(FILE *f, uint8_t kind, const char *vpath, const char *ppath, mode_t mode);
+
+void skip_record(FILE *f, MapRecord *record);
+
 #endif

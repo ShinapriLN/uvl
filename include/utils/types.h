@@ -16,7 +16,8 @@ typedef enum {
     ACTION_TYPE_LIST,
     ACTION_TYPE_CALL, 
     ACTION_TYPE_HAS,
-    ACTION_TYPE_UNMNT
+    ACTION_TYPE_UNMNT,
+    _INNER_ACTION_TYPE_MOUNT_MODE
 } ActionType;
 
 typedef struct {

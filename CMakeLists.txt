@@ -16,7 +16,6 @@ file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS
 )
 list(REMOVE_ITEM SOURCES
     "src/uvl/fuse.c"
-    "src/uvl/uvl.c"
 )
 add_executable(uvl ${SOURCES})
 target_include_directories(uvl PUBLIC

@@ -110,11 +110,11 @@ void scan_dir(const char *tool, const char *root_dir, const char *dir, const cha
             ssize_t n = readlink(path, target, sizeof(target) - 1);
             if (n >= 0) {
                 target[n] = '\0';
-                write_map(map, "SYM", vpath, target, st.st_mode);
+                write_record(map, UVL_KIND_SYMLINK, vpath, target, st.st_mode);
                 stats->files++;
             }
         } else if (S_ISDIR(st.st_mode)) {
-            write_map(map, "DIR", vpath, "", st.st_mode);
+            write_record(map, UVL_KIND_DIR, vpath, "", st.st_mode);
             scan_dir(tool, root_dir, path, vpath, map, stats);
         } else if (S_ISREG(st.st_mode)) {
             char hash[65];
@@ -135,7 +135,7 @@ void scan_dir(const char *tool, const char *root_dir, const char *dir, const cha
                     stats->stored_bytes += (uint64_t)st.st_size;
                 }
             }
-            write_map(map, "FILE", vpath, obj_path, st.st_mode);
+            write_record(map, UVL_KIND_FILE, vpath, obj_path, st.st_mode);
             stats->files++;
         }
     }
@@ -152,4 +152,9 @@ void manifest_path(char *out, size_t out_len, const char *tool, const char *targ
     else snprintf(parent, sizeof(parent), ".");
     snprintf(out, out_len, "%s/.uvl", parent);
     (void)tool;
+}
+
+const char *basename_of(const char *path) {
+    const char *slash = strrchr(path, '/');
+    return slash ? slash + 1 : path;
 }

@@ -1,6 +1,8 @@
 
 #include <stdlib.h>
 #include <errno.h>
+#include <unistd.h>
+#include <fcntl.h>
 
 #include "utils/node.h"
 #include "utils/constant.h"
@@ -14,6 +16,7 @@ Node *create_node(const char *name, int is_dir) {
     n->mode = is_dir ? 0755 : 0444;
     return n;
 }
+
 
 Node *find_child(Node *parent, const char *name) {
     Node *curr = parent->child;
@@ -86,3 +89,26 @@ int uvl_open(const char *path, struct fuse_file_info *fi) {
     fi->fh = fd;
     return 0;
 }
+
+int uvl_read(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi) {
+    (void)path;
+    int res = pread(fi->fh, buf, size, offset);
+    if (res == -1) res = -errno;
+    return res;
+}
+
+int uvl_readlink(const char *path, char *buf, size_t size) {
+    Node *n = find_node(path);
+    if (!n || !n->is_symlink) return -EINVAL;
+
+    strncpy(buf, n->p_path, size - 1);
+    buf[size - 1] = '\0';
+    return 0;
+}
+
+int uvl_release(const char *path, struct fuse_file_info *fi) {
+    (void)path;
+    close(fi->fh);
+    return 0;
+}
+

@@ -1,18 +1,17 @@
 # uvl
 
-`uvl` lets tools keep using their normal dependency directories while
+`uvl` lets package managers keep using their normal dependency directories while
 a FUSE filesystem redirects the physical files into a shared global store.
 
-Your project still sees `node_modules`, `.venv`, `vendor`, or any other entry
-directory the tool expects. The bytes live under:
+The project still sees directories like `node_modules` or `.venv`. The files
+live under:
 
 ```bash
 ~/.uvl/store/<manager>
 ```
 
-That means existing tools, editors, and runtime resolution keep working, but
-duplicated dependency files can be stored once and mounted back into each project
-as a read-only virtual directory.
+That keeps normal tool behavior intact while duplicate dependency trees can be
+stored once and mounted back into each project as a read-only virtual view.
 
 ## Install
 
@@ -27,17 +26,30 @@ uv tool install uvl-fuse
 From this repository:
 
 ```bash
-git clone https://github.com/ShinapriLN/uvl.git
-cd uvl
-make build
-uv tool install .
+❯ git clone https://github.com/ShinapriLN/uvl.git
+  ...
+❯ cd uvl
+❯ make
+  ...
+❯ ./build/uvl --help
+uvl: virtual dependency directories backed by a shared FUSE store
+
+Usage:
+  uvl --fuse <tool> --mnt <dir>   Register/fustion a tool mount directory
+  uvl --fiss <tool>               Remove/fission a tool out of uvl
+  uvl <tool> [args...]            Run the tool through uvl
+  uvl --unmnt <dir>               Unmount a virtualized dependency directory
+  uvl --stat                      Show current project mount status
+  uvl --list, -l                  List fused tools
+  uvl --has <tool>                Check whether a tool is fused with uvl
+  uvl --version, -v               Print version
 ```
 
-Prebuilt wheels include the native engine, so installation does not compile
-anything. On Linux, runtime mounting still needs FUSE support and permission to
-mount filesystems.
+Published wheels include the native engine, so installation does not need to
+compile the C code. Runtime mounting still needs Linux FUSE support and
+permission to mount filesystems.
 
-If you build from source instead of using a prebuilt wheel, install:
+If you build from source, install:
 
 - `cmake`
 - a C compiler such as `gcc` or `clang`
@@ -48,7 +60,7 @@ If you build from source instead of using a prebuilt wheel, install:
 
 ## Platform Support
 
-Current published wheels:
+Published wheels:
 
 - Linux x86_64
 
@@ -58,41 +70,30 @@ Runtime requirements:
 - `/dev/fuse` access
 - `fusermount3` or an equivalent FUSE unmount helper
 
-Source builds are still possible from this repository, but the published PyPI
-package is intended for Linux x86_64 users who want a prebuilt wheel.
+Source builds work on the same Linux environment, but the runtime FUSE
+requirements still apply.
 
 ## Build From Source
 
-The repository currently has two runnable paths:
+The repository has one native CLI binary built by CMake:
 
-- `build/uvl`: a single native binary built by CMake. It handles the CLI,
-  tool wrapping, object storage, and FUSE mount mode in one
-  executable.
-- Python package entrypoint: kept for packaging compatibility while the native
-  binary matures.
+- `build/uvl`
+
+The binary handles the CLI, tool wrapping, object storage, and FUSE mount mode
+in a single executable. It re-executes itself internally for mount mode, so
+there is no separate mount binary to manage.
 
 Use the Makefile wrapper for day-to-day commands:
 
 ```bash
 make          # configure CMake and build the native binary
 make build    # same as make
-make check    # build C code and run Python import/CLI checks
+make check    # build the native binary and run a CLI smoke check
 make wheel    # build a wheel with the bundled native binary
 make clean    # remove build outputs and Python bytecode
 ```
 
-The native build output is created at:
-
-```bash
-build/uvl
-```
-
-The native binary starts its own internal FUSE mode by re-executing itself as
-`uvl __mount ...`, so there is no separate `uvl_fuse` binary in the CMake build.
-The Python wheel bundles this binary at `uvl/native/uvl` so users do not need to
-compile it during install.
-
-## Mount A Tool
+## Register A Tool
 
 Register the tool binary and the dependency directory it owns:
 
@@ -101,68 +102,130 @@ uvl --fuse bun --mnt node_modules
 ```
 
 ```text
-🚀 bun has been mounted with uvl.
-👍 now you can use `uvl bun ...` with any bun arguments.
-✨ node_modules will physically store at ~/.uvl/store/bun
-
-💥 Caution: While a directory is mounted by uvl, avoid deleting or modifying it directly.
-Unmount it first with `uvl --unmnt node_modules`.
+[UVL] [ INFO ] Fused `bun` with uvl.
+[UVL] [ INFO ] Mount directory: `node_modules`
+[UVL] [ INFO ] Store: ~/.uvl/store/bun
+[UVL] [ INFO ] Run `uvl bun ...` to use it through uvl.
 ```
 
-Then run the tool through `uvl` when dependencies may change:
-
-```bash
-uvl bun install
-uvl bun add vite
-uvl bun remove vite
-```
-
-After the tool finishes, `uvl` scans the dependency directory, moves
-physical files into `~/.uvl/store/bun/objects`, updates the project `.uvl`
-binary manifest, clears the local directory, and mounts the
-virtual view back at `node_modules`.
-
-The directory still works as normal:
-
-```bash
-bun run index.ts
-uvl bun run index.ts
-```
-
-But disk usage in the project directory is near zero:
-
-```bash
-du -sh node_modules
-# 0 node_modules
-```
-
-## Python Example
-
-Register `uv` with its virtual environment directory:
+The same pattern works for `uv`:
 
 ```bash
 uvl --fuse uv --mnt .venv
 ```
 
-Create or sync a project through `uvl`:
+Useful management flags:
 
 ```bash
-uvl uv init app
-cd app
-uvl uv sync
+uvl --list     # list registered tools from ~/.uvl/config.json
+uvl --has uv   # check whether a tool binary exists in PATH
+uvl --fiss uv  # remove a tool from ~/.uvl/config.json
+uvl --stat    # show current project mount status
+uvl --unmnt .venv
 ```
 
-`uvl` mounts `.venv` after `uv sync`, while the stored files live under:
+## Usage
+
+After a tool is registered, run it through `uvl` whenever the dependency tree
+may change.
+
+### Bun
 
 ```bash
-~/.uvl/store/uv
+❯ uvl bun install
+bun install v1.2.10 (db2e7d7f)
+
++ typescript@5.9.3
++ @types/bun@1.3.13
+
+5 packages installed [11.00ms]
+[UVL] [ INFO ] Taking control of '<project>/node_modules'.
+[UVL] [ INFO ] Mounting virtual filesystem with 635 files...
+[UVL] [ INFO ] Successfully mounted virtual '<project>/node_modules'.
+[UVL] [ INFO ] Deduplication saved 27.50 MB of physical disk space.
+[UVL] [ INFO ] Virtualized 27.50 MB into ~/.uvl/store/bun.
+
+❯ uvl bun add vite
+[uvl] Restoring mounted entry 'node_modules' before running bun
+bun add v1.2.10 (db2e7d7f)
+
+installed vite@8.0.11 with binaries:
+ - vite
+
+17 packages installed [1.88s]
+[UVL] [ INFO ] Re-virtualizing '<project>/node_modules' after command completed.
+[UVL] [ INFO ] Mounting virtual filesystem with 846 files...
+[UVL] [ INFO ] Successfully remounted virtual '<project>/node_modules'.
+[UVL] [ INFO ] Deduplication saved 26.39 MB of physical disk space.
+[UVL] [ INFO ] Virtualized 93.64 MB into ~/.uvl/store/bun.
+```
+
+The directory still works as normal:
+
+```bash
+❯ bun run index.ts
+Hello via Bun!
+
+❯ uvl bun run index.ts
+Hello via Bun!
+```
+
+Disk usage in the project directory stays near zero:
+
+```bash
+❯ du -sh node_modules
+0	node_modules
+```
+
+### Uv
+
+```bash
+❯ uv init app
+Initialized project `app` at `<project-root>/app`
+
+❯ cd app
+
+❯ uvl uv sync
+Using CPython 3.12.12
+Creating virtual environment at: .venv
+Resolved 1 package in 2ms
+Audited in 0.00ms
+[UVL] [ INFO ] Taking control of '<project>/.venv'.
+[UVL] [ INFO ] Mounting virtual filesystem with 19 files...
+[UVL] [ INFO ] Successfully mounted virtual '<project>/.venv'.
+[UVL] [ INFO ] Deduplication saved 0.01 MB of physical disk space.
+[UVL] [ INFO ] Virtualized 0.03 MB into ~/.uvl/store/uv.
 ```
 
 Running through either command still works:
 
 ```bash
-uvl uv run main.py
-uv run main.py
+❯ uvl uv run main.py
+Hello from app!
+
+❯ uv run main.py
+Hello from app!
+```
+
+## Project Status
+
+`--stat` shows every mounted tool in the current project. A project can track
+multiple entries at once:
+
+```bash
+❯ uvl --stat
+Project status:
+  manifest: <project>/.uvl
+  uv:
+    mount: .venv
+    store: ~/.uvl/store/uv
+    records: 46469
+    mounted: yes
+  bun:
+    mount: node_modules
+    store: ~/.uvl/store/bun
+    records: 22364
+    mounted: yes
 ```
 
 ## Unmount
@@ -174,50 +237,27 @@ delete, inspect, or rebuild the directory directly, unmount it first:
 uvl --unmnt .venv
 ```
 
-```text
-✅ Unmounted .venv
-⚡ You can now delete or modify anything inside
-```
-
 After unmounting, the mount point is just a normal directory again.
-
-## Commands
-
-```bash
-uvl --fuse <tool> --mnt <dir>    Register a tool mount directory
-uvl --fiss <tool>                Remove a tool from ~/.uvl/config.json
-uvl <tool> [args...]              Run a mounted tool
-uvl --unmnt <dir>                 Unmount a virtualized directory
-uvl --status                      Show current project mount status
-uvl --list                        List registered tools
-uvl --has <tool>                  Check if a mounted tool is installed
-uvl --version                     Print the version
-```
-
-`uvl` has defaults for common tools, so this is also valid:
-
-```bash
-uvl --fuse bun
-uvl --fuse uv
-uvl --fiss bun
-```
 
 ## How It Works
 
 1. `uvl --fuse <tool> --mnt <dir>` saves a registration in
    `~/.uvl/config.json`.
 2. `uvl --fiss <tool>` removes the tool from `~/.uvl/config.json`.
-3. `uvl <tool> ...` runs the real tool binary with the same
-   arguments.
-4. If the registered entry directory exists and is not already mounted, `uvl`
-   scans the result.
+3. `uvl <tool> ...` resolves the real tool binary from `PATH` and runs it with
+   the same arguments.
+4. If the registered entry directory exists, `uvl` restores the mounted view
+   before the tool changes files.
 5. Files are content-addressed by SHA-256 and stored under
    `~/.uvl/store/<tool>/objects`.
-6. A binary project `.uvl` manifest stores every mounted tool, mount directory,
-   and virtual path map for fast loading. One project can track entries such as
+6. A binary project `.uvl` manifest stores every mounted tool and mount
+   directory for fast loading. One project can track multiple entries such as
    `.venv` and `node_modules` at the same time.
 7. A C FUSE daemon mounts a read-only virtual filesystem at the original
    dependency directory.
 
-The goal is simple: tools keep their normal layout; projects stop
-holding duplicate physical dependency trees.
+The goal is simple: tools keep their normal layout while projects stop holding
+duplicate physical dependency trees.
+
+---
+*Shinapri*

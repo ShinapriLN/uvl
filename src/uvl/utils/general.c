@@ -1,6 +1,8 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
+
 #include "utils/general.h"
 
 bool streq(const char *str1, const char *str2){
@@ -10,33 +12,79 @@ bool streq(const char *str1, const char *str2){
     return false;
 }
 
-// void slice_string(char *str, size_t i, size_t j){
-//     str[j] = '\0';
-//     str[0] = str[0] + i;
-// }
+char *slice_string(const char *str, const size_t i, const size_t j){
 
-// char *replace_string(char *str, char *matched_str, char *replaced_str) {
-//     size_t sub_str_len = strlen(sub_str);
+    if (j <= i) {
+        return NULL;
+    }
 
-//     char *copied_sub_str;
+    size_t len = j - i;
 
-//     size_t i = 0, k = 0, found = 0;
-//     while (str[i] != '\0'){
-//         if (matched_str[k] == str[i]){
-//             k++;
-//         }else{
-//             k = 0;
-//         }
+    char *out = malloc(len + 1);
+    if (!out) return NULL;
 
-//         if (matched_str[k] == '\0'){
-//             strcpy(copied_sub_str, str);
-//             for (size_t j = k; j > 0; j--){
+    memcpy(out, str + i, len);
+    out[len] = '\0';
 
-//             }
-//             k = 0;
-//         }
+    return out;
+}
 
-//         i++;
-//     }
+char *concat_string(const char *str1, const char *str2) {
+    size_t len1 = strlen(str1);
+    size_t len2 = strlen(str2);
 
-// }
+    char *out = malloc(len1 + len2 + 1);
+    if (!out) return NULL;
+
+    memcpy(out, str1, len1);
+    memcpy(out + len1, str2, len2 + 1);
+
+    return out;
+}
+
+char *replace_string(const char *str, const char *match, const char *replace) {
+    if (!str || !match || !replace) return NULL;
+
+    size_t str_len = strlen(str);
+    size_t match_len = strlen(match);
+    size_t replace_len = strlen(replace);
+
+    if (match_len == 0) {
+        char *out = malloc(str_len + 1);
+        if (!out) return NULL;
+        memcpy(out, str, str_len + 1);
+        return out;
+    }
+
+    size_t count = 0;
+    const char *p = str;
+
+    while ((p = strstr(p, match)) != NULL) {
+        count++;
+        p += match_len;
+    }
+
+    size_t out_len = str_len + count * (replace_len - match_len);
+    char *out = malloc(out_len + 1);
+    if (!out) return NULL;
+
+    const char *src = str;
+    char *dst = out;
+
+    while ((p = strstr(src, match)) != NULL) {
+        size_t n = (size_t)(p - src);
+
+        memcpy(dst, src, n);
+        dst += n;
+
+        memcpy(dst, replace, replace_len);
+        dst += replace_len;
+
+        src = p + match_len;
+    }
+
+    strcpy(dst, src);
+
+    return out;
+}
+
